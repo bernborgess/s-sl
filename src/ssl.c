@@ -1,4 +1,4 @@
-/*
+/**
  *	C S/SL Processor
  *
  *	Translated from Turing S/SL Processor V3.01
@@ -77,11 +77,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifndef SELFCONTAINED
-#include "ssl:sst.h"
-#endif
+#include "ssl.sst.h"
 /* The S/SL table file produced by the S/SL Processor */
-#include "ssl:sst.c"
+#include "ssl.sst.c"
 
 #define true 1
 #define false 0
@@ -121,114 +119,11 @@ char *machineOpNames[] = {"oCall",
 char *errorCodeNames[] = {"eNoError", "eSyntaxError", "ePrematureEndOfFile",
                           "eExtraneousProgramText", 0};
 
-#ifdef SELFCONTAINED
-/*
- * Primitive S/SL Table Operations:
- * These will remain the same independent of the
- * pass and form the fundamental table operations.
- */
-
-typedef enum {
-  oCall = 0,           /* 0 */
-  oReturn,             /* 1 */
-  oRuleEnd,            /* 2 */
-  oJump,               /* 3 */
-  oInput,              /* 4 */
-  oInputAny,           /* 5 */
-  oInputChoice,        /* 6 */
-  oEmit,               /* 7 */
-  oError,              /* 8 */
-  oChoice,             /* 9 */
-  oChoiceEnd,          /* 10 */
-  oSetParameter,       /* 11 */
-  oSetResult,          /* 12 */
-  oSetResultFromInput, /* 13 */
-
-  /*
-   * Pass Dependent Semantic Operations:
-   * These will be different for each pass.  The
-   * semantic operations are implemented by the
-   * Semantic Mechanisms of the pass.
-   * There are two basic kinds of semantic operations:
-   * Update operations, which cause an update to the
-   * Semantic Mechanism, and Choice operations, which
-   * return a value based on the state of the Semantic
-   * Mechanism which is then used as the tag in a semantic
-   * choice.  Both Update and Choice operations may be
-   * parameterized by a single constant value.
-   */
-
-  oEnterCall,                         /* 14 */
-  oEmitNullCallAddress,               /* 15 */
-  oResolveCalls,                      /* 16 */
-  oSetClass,                          /* 17 */
-  oSetClassFromSymbolClass,           /* 18 */
-  oxSetClassFromSymbolValue,          /* 19 */
-  oySetClassFromSymbolResultClass,    /* 20 */
-  ozSetClassFromSymbolParameterClass, /* 21 */
-  ovSetClassFromChoiceClass,          /* 22 */
-  oChooseClass,                       /* 23 */
-  oSetClassValue,                     /* 24 */
-  owSetClassValueFromSymbolValue,     /* 25 */
-  oIncrementClassValue,               /* 26 */
-  oEnterNewSymbol,                    /* 27 */
-  oLookupSymbol,                      /* 28 */
-  oChangeSymbolClass,                 /* 29 */
-  oChooseSymbolClass,                 /* 30 */
-  oVerifySymbolClass,                 /* 31 */
-  oxEnterNewSymbolValue,              /* 32 */
-  oEnterSecondNewSymbolValue,         /* 33 */
-  oEnterSymbolValueFromAddress,       /* 34 */
-  oxChooseSymbolValue,                /* 35 */
-  oEmitSymbolValue,                   /* 36 */
-  oxVerifySymbolClassValue,           /* 37 */
-  oxEnterSymbolParameterClass,        /* 38 */
-  oyEnterSymbolResultClass,           /* 39 */
-  oyChooseSymbolResultClass,          /* 40 */
-  oSaveEnclosingSymbol,               /* 41 */
-  oRestoreEnclosingSymbol,            /* 42 */
-  oSaveCurrentSymbol,                 /* 43 */
-  oRestoreCurrentSymbol,              /* 44 */
-  oPushCycle,                         /* 45 */
-  oPopCycle,                          /* 46 */
-  oChooseCycleDepth,                  /* 47 */
-  oEmitCycleAddress,                  /* 48 */
-  oEnterCycleExit,                    /* 49 */
-  oResolveCycleExits,                 /* 50 */
-  oxChooseCycleExits,                 /* 51 */
-  oPushChoice,                        /* 52 */
-  oPopChoice,                         /* 53 */
-  oChangeChoiceClass,                 /* 54 */
-  oChooseChoiceClass,                 /* 55 */
-  oVerifyChoiceSymbolLabel,           /* 56 */
-  oEnterChoiceSymbolLabel,            /* 57 */
-  oxEnterChoiceMerge,                 /* 58 */
-  oResolveChoiceMerges,               /* 59 */
-  oEmitChoiceTable,                   /* 60 */
-  oxResolveChoiceTableAddress,        /* 61 */
-  oEmitFirstChoiceValue,              /* 62 */
-  oxEmitFirstChoiceAddress,           /* 63 */
-  oStartRules,                        /* 64 */
-  oBeginRule,                         /* 65 */
-  oSaveRule,                          /* 66 */
-  oEndRules,                          /* 67 */
-  oGenerateDefinitions,               /* 68 */
-  oGenerateTable,                     /* 69 */
-  oEmitValue,                         /* 70 */
-  oEmitNullAddress                    /* 71 */
-} TableOperation;
-#endif /* SELFCONTAINED */
-
 /* S/SL Table Size */
 #define sslTableSize 30000 /* Maximum */
 
 /* The S/SL Rule Call Stack Size */
 #define sslStackSize 127
-
-#ifdef SELFCONTAINED
-/* Operation Result Values */
-typedef enum { invalid, valid } Validity;
-#endif /* SELFCONTAINED */
 
 /* Maximum Source Lines */
 #define maxLineNumber 9999
@@ -239,104 +134,10 @@ typedef enum {
   fChoiceRuleFailed      /* 1 */
 } FailureCodes;          /* S/SL System Failure Code Type */
 
-#ifdef SELFCONTAINED
-/* Error Signal Codes */
-typedef enum {
-  eNoError = 0,           /* 0 */
-  eSyntaxError,           /* 1 */
-  ePrematureEndOfFile,    /* 2 */
-  eExtraneousProgramText, /* 3 */
-
-  /* Semantic Errors */
-  eCycleHasNoExits = 10,     /* 10 */
-  eDuplicateLabel,           /* 11 */
-  eExitNotInCycle,           /* 12 */
-  eIllegalParameterClass,    /* 13 */
-  eIllegalResultClass,       /* 14 */
-  eIllegalNonvaluedReturn,   /* 15 */
-  eIllegalStringSynonym,     /* 16 */
-  eIllegalValuedReturn,      /* 17 */
-  eSymbolPreviouslyDefined,  /* 18 */
-  eUndefinedSymbol,          /* 19 */
-  eWrongDeclaredResultClass, /* 20 */
-  eWrongLabelClass,          /* 21 */
-  eWrongParameterClass,      /* 22 */
-  eWrongResultClass,         /* 23 */
-  eWrongSymbolClass,         /* 24 */
-
-  /* Non-S/SL Semantic Errors */
-  eUnresolvedRule = 30, /* 30 */
-  eSymbolTooLong,       /* 31 */
-  eNumberTooLarge,      /* 32 */
-  eStringTooLong,       /* 33 */
-  eValueOutOfRange,     /* 34 */
-  eJumpOutOfRange,      /* 35 */
-
-  /* Fatal Errors */
-  eSslStackOverflow = 40,   /* 40 */
-  eCallStackOverflow,       /* 41 */
-  eTooManyTotalSymbolChars, /* 42 */
-  eTooManySymbols,          /* 43 */
-  eTableTooLarge,           /* 44 */
-  eCyclesTooDeep,           /* 45 */
-  eTooManyExits,            /* 46 */
-  eChoicesTooDeep,          /* 47 */
-  eTooManyLabels,           /* 48 */
-  eTooManyMerges,           /* 49 */
-  eTooManyCalls,            /* 50 */
-  eRuleTooLarge,            /* 51 */
-} ErrorCodes;               /* Error Code Type */
-#endif                      /* SELFCONTAINED */
-
 ErrorCodes firstFatalErrorCode = eSslStackOverflow;
 
 /* Maximum Error Count */
 #define maxErrors 100
-
-#ifdef SELFCONTAINED
-/* Input Tokens */
-typedef enum {
-  /* Nonexistent input token used only in syntax error recovery */
-  tSyntaxError = -1, /* -1 */
-
-  /* Compound Input Tokens */
-  tIdent = 0, /* 0 */
-  tString,    /* 1 */
-  tInteger,   /* 2 */
-
-  /* Non-Compound Input Tokens */
-  tColon,        /* 3 */
-  tSemicolon,    /* 4 */
-  tEqual,        /* 5 */
-  tQuestionMark, /* 6 */
-  tPeriod,       /* 7 */
-  tErrorSignal,  /* 8 */
-  tCall,         /* 9 */
-  tExit,         /* 10 */
-  tReturn,       /* 11 */
-  tLeftParen,    /* 12 */
-  tRightParen,   /* 13 */
-  tCycle,        /* 14 */
-  tCycleEnd,     /* 15 */
-  tChoice,       /* 16 */
-  tChoiceEnd,    /* 17 */
-  tComma,        /* 18 */
-  tOr,           /* 19 */
-  tOtherwise,    /* 20 */
-  tInput,        /* 21 */
-  tOutput,       /* 22 */
-  tError,        /* 23 */
-  tType,         /* 24 */
-  tMechanism,    /* 25 */
-  tRules,        /* 26 */
-  tEnd,          /* 27 */
-  tNewLine,      /* 28 */
-  tEndOfFile,    /* 29 */
-
-  /* Special token returned by Input Scanner for garbage */
-  tIllegal     /* 30 */
-} InputTokens; /* Input Token Type */
-#endif         /* SELFCONTAINED */
 
 InputTokens firstCompoundToken = tIdent;
 InputTokens lastCompoundToken = tInteger;
@@ -356,30 +157,6 @@ InputTokens lastInputToken = tIllegal;
 #define quote '\''
 #define breakChar '_'
 
-#ifdef SELFCONTAINED
-/*
- * Output Tokens for the S/SL Processor,
- * these are the primitive operations of S/SL
- */
-
-typedef enum {
-  aCall = oCall,
-  aReturn = oReturn,
-  aRuleEnd = oRuleEnd,
-  aJump = oJump,
-  aInput = oInput,
-  aInputAny = oInputAny,
-  aInputChoice = oInputChoice,
-  aEmit = oEmit,
-  aError = oError,
-  aChoice = oChoice,
-  aChoiceEnd = oChoiceEnd,
-  aSetParameter = oSetParameter,
-  aSetResult = oSetResult,
-  aSetResultFromInput = oSetResultFromInput
-} OutputTokens; /* Output Token Type */
-#endif          /* SELFCONTAINED */
-
 /* Limits on the Assembled Output S/SL Table */
 #define maxOutputTableSize 30000
 #define nullAddress -7777
@@ -390,27 +167,6 @@ typedef enum {
  */
 
 /* The Symbol Table */
-
-#ifdef SELFCONTAINED
-/* Classes of Symbols */
-typedef enum {
-  cNotFound = 0,  /* 0 */
-  cInput,         /* 1 */
-  cOutput,        /* 2 */
-  cInputOutput,   /* 3 */
-  cError,         /* 4 */
-  cType,          /* 5 */
-  cMechanism,     /* 6 */
-  cUpdateOp,      /* 7 */
-  cParmUpdateOp,  /* 8 */
-  cChoiceOp,      /* 9 */
-  cParmChoiceOp,  /* 10 */
-  cRule,          /* 11 */
-  cChoiceRule,    /* 12 */
-  maxClasses = 50 /* 50 */
-} SymbolClass;
-#endif /* SELFCONTAINED */
-
 SymbolClass firstTypeClass = (SymbolClass)(((int)cChoiceRule) + 1);
 
 /* Symbol Table Limits */
@@ -425,10 +181,6 @@ ErrorCodes firstUserErrorSignalValue = eCycleHasNoExits;
 TableOperation firstUserSemanticOperationValue = oEnterCall;
 
 /* Undefined value  */
-#ifdef SELFCONTAINED
-typedef enum { zero = 0, undefined = -9999 } Integer;
-#endif /* SELFCONTAINED */
-
 #define nullValue (int)undefined
 
 /* The Call Table */
@@ -1313,6 +1065,15 @@ void Error(errCode) ErrorCodes errCode;
   case eWrongResultClass:
     printf("Result value is wrong type\n");
     break;
+  case eCallStackOverflow:
+    printf("Stack overflow\n");
+    break;
+  case eSslStackOverflow:
+    printf("SSL stack overflow\n");
+    break;
+  case eNoError:
+    printf("eNoError\n");
+    break;
   }
 
   ++noErrors;
@@ -1638,8 +1399,9 @@ void EnterNewSymbol() {
     symValue[symTop] = nullValue;
     symParmClass[symTop] = cNotFound;
     symResultClass[symTop] = cNotFound;
-  } else
+  } else {
     Error(eTooManySymbols);
+  }
 
   symIndex = symTop;
 }
